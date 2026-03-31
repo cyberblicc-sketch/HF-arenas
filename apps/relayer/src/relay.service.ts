@@ -30,7 +30,10 @@ type SubmitRelayInput = {
 @Injectable()
 export class RelayService implements OnApplicationShutdown {
   private readonly logger = new Logger(RelayService.name);
-  private readonly activeTimers = new Map<string, NodeJS.Timeout>();
+  private readonly activeTimers = new Map<
+    string,
+    { pollInterval: NodeJS.Timeout; safetyTimeout: NodeJS.Timeout }
+  >();
   private readonly MAX_POLLING_DURATION = 15 * 60 * 1000;
   private shuttingDown = false;
 
@@ -50,7 +53,7 @@ export class RelayService implements OnApplicationShutdown {
       name: 'ArenaMarket',
       version: '1',
       chainId: dto.chainId,
-      verifyingContract: dto.marketAddress,
+      verifyingContract: ethers.getAddress(dto.marketAddress),
     };
 
     const types = {
@@ -65,8 +68,8 @@ export class RelayService implements OnApplicationShutdown {
     };
 
     const value = {
-      market: dto.marketAddress,
-      user: dto.user,
+      market: domain.verifyingContract,
+      user: ethers.getAddress(dto.user),
       outcome: dto.outcome,
       amount: dto.amount,
       nonce,
@@ -143,7 +146,10 @@ export class RelayService implements OnApplicationShutdown {
 
   onApplicationShutdown() {
     this.shuttingDown = true;
-    this.activeTimers.forEach((timer) => clearInterval(timer));
+    this.activeTimers.forEach(({ pollInterval, safetyTimeout }) => {
+      clearInterval(pollInterval);
+      clearTimeout(safetyTimeout);
+    });
     this.activeTimers.clear();
     this.logger.log('Cleaned up relay polling timers');
   }
@@ -184,9 +190,10 @@ export class RelayService implements OnApplicationShutdown {
     if (this.shuttingDown) return;
 
     const safetyTimeout = setTimeout(() => {
-      const timer = this.activeTimers.get(taskId);
-      if (timer) {
-        clearInterval(timer);
+      const timers = this.activeTimers.get(taskId);
+      if (timers) {
+        clearInterval(timers.pollInterval);
+        clearTimeout(timers.safetyTimeout);
         this.activeTimers.delete(taskId);
         this.logger.warn(`Force cleared timer for ${taskId}`);
       }
@@ -202,6 +209,16 @@ export class RelayService implements OnApplicationShutdown {
       attempts += 1;
       try {
         const status = await this.gelato.getTaskStatus(taskId);
+        if (!status) {
+          if (attempts > 60) {
+            await this.prisma.relayedTransaction.update({
+              where: { id: dbId },
+              data: { status: 'FAILED', error: 'Polling timeout exceeded' },
+            });
+            this.clearTimer(taskId, safetyTimeout);
+          }
+          return;
+        }
         if (status.taskState === 'ExecSuccess') {
           await this.prisma.relayedTransaction.update({
             where: { id: dbId },
@@ -221,13 +238,14 @@ export class RelayService implements OnApplicationShutdown {
       }
     }, 15000);
 
-    this.activeTimers.set(taskId, timer);
+    this.activeTimers.set(taskId, { pollInterval: timer, safetyTimeout });
   }
 
   private clearTimer(taskId: string, safetyTimeout: NodeJS.Timeout) {
-    const timer = this.activeTimers.get(taskId);
-    if (timer) {
-      clearInterval(timer);
+    const timers = this.activeTimers.get(taskId);
+    if (timers) {
+      clearInterval(timers.pollInterval);
+      clearTimeout(timers.safetyTimeout);
       this.activeTimers.delete(taskId);
     }
     clearTimeout(safetyTimeout);

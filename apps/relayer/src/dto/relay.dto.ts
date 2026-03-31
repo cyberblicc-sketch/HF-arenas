@@ -57,7 +57,7 @@ export class RelayResponseDto {
 
 export function normalizeAddress(address: string): string {
   try {
-    return ethers.getAddress(address).toLowerCase();
+    return ethers.getAddress(address);
   } catch {
     throw new Error(`Invalid address: ${address}`);
   }
