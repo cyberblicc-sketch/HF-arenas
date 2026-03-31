@@ -6,9 +6,9 @@ dataSources:
     name: ArenaRegistry
     network: polygon
     source:
-      address: "0x0000000000000000000000000000000000000000"
+      address: "${REGISTRY_ADDRESS}"
       abi: ArenaRegistry
-      startBlock: 0
+      startBlock: ${REGISTRY_START_BLOCK}
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -27,9 +27,9 @@ dataSources:
     name: ArenaFactory
     network: polygon
     source:
-      address: "0x0000000000000000000000000000000000000000"
+      address: "${FACTORY_ADDRESS}"
       abi: ArenaFactory
-      startBlock: 0
+      startBlock: ${FACTORY_START_BLOCK}
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7

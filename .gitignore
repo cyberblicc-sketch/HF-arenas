@@ -14,3 +14,6 @@ artifacts
 broadcast
 out
 typechain-types
+
+# Generated from subgraph.template.yaml by scripts/prepare-subgraph.sh
+subgraph/subgraph.yaml
