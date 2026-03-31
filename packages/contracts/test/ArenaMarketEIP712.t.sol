@@ -9,6 +9,7 @@ import {MockUSDC} from "./helpers/MockUSDC.sol";
 contract ArenaMarketEIP712Test is Test {
     ArenaRegistry internal registry;
     ArenaMarket internal market;
+    MockUSDC internal usdc;
 
     address internal admin = address(0xA11CE);
     address internal user = address(0xBEEF);
@@ -20,8 +21,9 @@ contract ArenaMarketEIP712Test is Test {
 
     function setUp() public {
         oracle = vm.addr(oraclePk);
+        usdc = new MockUSDC();
         vm.startPrank(admin);
-        registry = new ArenaRegistry(address(new MockUSDC()), admin);
+        registry = new ArenaRegistry(address(usdc), admin);
         registry.grantRole(registry.ORACLE_ROLE(), oracle);
         market = new ArenaMarket();
 
@@ -47,6 +49,11 @@ contract ArenaMarketEIP712Test is Test {
 
         vm.prank(oracle);
         market.approveMarket();
+
+        // Fund user so successful bets can be placed in relevant tests.
+        usdc.mint(user, 100_000_000);
+        vm.prank(user);
+        usdc.approve(address(market), type(uint256).max);
     }
 
     function testBetTypehashExists() public view {
@@ -151,23 +158,5 @@ contract ArenaMarketEIP712Test is Test {
         vm.prank(user);
         vm.expectRevert("Market: invalid sig");
         market2.placeBet(OUTCOME_YES, amount, nonce, deadline, sig);
-    }
-}
-
-contract MockUSDC {
-    string public name = "Mock USDC";
-    string public symbol = "mUSDC";
-    uint8 public decimals = 6;
-
-    function transferFrom(address, address, uint256) external pure returns (bool) {
-        return true;
-    }
-
-    function transfer(address, uint256) external pure returns (bool) {
-        return true;
-    }
-
-    function allowance(address, address) external pure returns (uint256) {
-        return type(uint256).max;
     }
 }
