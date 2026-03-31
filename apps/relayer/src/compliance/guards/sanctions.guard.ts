@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '@arena/shared-prisma';
+import { normalizeAddress } from '../../dto/relay.dto';
 import { SanctionsProvider } from '../providers/sanctions.provider';
 
 @Injectable()
@@ -14,7 +15,7 @@ export class SanctionsGuard implements CanActivate {
     const address = request.body?.userAddress || request.params?.address;
     if (!address) return true;
 
-    const normalized = String(address).toLowerCase();
+    const normalized = normalizeAddress(String(address));
     const cached = await this.prisma.sanctionCheck.findFirst({
       where: {
         address: normalized,
