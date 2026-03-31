@@ -70,6 +70,15 @@ contract ArenaRegistryTest is Test {
     function testSetFeesSuccess() public {
         vm.prank(admin);
         registry.setFees(300, 150, 50, 100);
+
+        // Fees are not applied until the timelock expires and executeFees() is called.
+        assertEq(registry.protocolFeeBps(), 275);
+
+        vm.warp(block.timestamp + 2 days);
+
+        vm.prank(admin);
+        registry.executeFees();
+
         assertEq(registry.protocolFeeBps(), 300);
         assertEq(registry.creatorFeeBps(), 150);
         assertEq(registry.referralFeeBps(), 50);
@@ -79,8 +88,28 @@ contract ArenaRegistryTest is Test {
     function testSetFeesEmitsEvent() public {
         vm.prank(admin);
         vm.expectEmit(false, false, false, true);
-        emit ArenaRegistry.FeesUpdated(300, 150, 50, 100);
+        emit ArenaRegistry.FeesProposed(300, 150, 50, 100);
         registry.setFees(300, 150, 50, 100);
+    }
+
+    function testExecuteFeesEmitsUpdatedEvent() public {
+        vm.prank(admin);
+        registry.setFees(300, 150, 50, 100);
+        vm.warp(block.timestamp + 2 days);
+
+        vm.prank(admin);
+        vm.expectEmit(false, false, false, true);
+        emit ArenaRegistry.FeesUpdated(300, 150, 50, 100);
+        registry.executeFees();
+    }
+
+    function testExecuteFeesRevertsBeforeTimelock() public {
+        vm.prank(admin);
+        registry.setFees(300, 150, 50, 100);
+
+        vm.prank(admin);
+        vm.expectRevert("Registry: timelock active");
+        registry.executeFees();
     }
 
     function testSetFeesRevertsWhenExceedsMax() public {
@@ -100,6 +129,15 @@ contract ArenaRegistryTest is Test {
     function testSetTreasurySuccess() public {
         vm.prank(admin);
         registry.setTreasury(treasury2);
+
+        // Treasury is not updated until the timelock expires and executeTreasury() is called.
+        assertEq(registry.treasury(), admin);
+
+        vm.warp(block.timestamp + 2 days);
+
+        vm.prank(admin);
+        registry.executeTreasury();
+
         assertEq(registry.treasury(), treasury2);
     }
 
