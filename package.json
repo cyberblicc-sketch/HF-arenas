@@ -16,7 +16,10 @@
     "relayer:dev": "pnpm --dir apps/relayer run start:dev",
     "indexer:dev": "pnpm --dir apps/indexer run start:dev",
     "subgraph:codegen": "pnpm --dir subgraph run codegen",
-    "subgraph:build": "pnpm --dir subgraph run build"
+    "subgraph:build": "pnpm --dir subgraph run build",
+    "abi:sync": "./scripts/sync-abis.sh",
+    "subgraph:prepare": "./scripts/prepare-subgraph.sh",
+    "bootstrap": "pnpm install && pnpm prisma:generate && pnpm contracts:build && pnpm abi:sync && pnpm subgraph:prepare && pnpm subgraph:codegen && pnpm subgraph:build && pnpm build"
   },
   "devDependencies": {
     "turbo": "^2.1.3"
