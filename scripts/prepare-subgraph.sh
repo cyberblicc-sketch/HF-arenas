@@ -38,10 +38,14 @@ export REGISTRY_ADDRESS FACTORY_ADDRESS REGISTRY_START_BLOCK FACTORY_START_BLOCK
 if command -v envsubst &>/dev/null; then
   envsubst < "$TEMPLATE" > "$OUTPUT"
 else
-  # Fallback: use sed when envsubst is unavailable
+  # Fallback: use sed when envsubst is unavailable.
+  # Addresses are hex (0x…) and blocks are integers so pipe
+  # delimiters are safe; escape & in replacement to be defensive.
+  safe_reg="${REGISTRY_ADDRESS//&/\\&}"
+  safe_fac="${FACTORY_ADDRESS//&/\\&}"
   sed \
-    -e "s|\${REGISTRY_ADDRESS}|${REGISTRY_ADDRESS}|g" \
-    -e "s|\${FACTORY_ADDRESS}|${FACTORY_ADDRESS}|g" \
+    -e "s|\${REGISTRY_ADDRESS}|${safe_reg}|g" \
+    -e "s|\${FACTORY_ADDRESS}|${safe_fac}|g" \
     -e "s|\${REGISTRY_START_BLOCK}|${REGISTRY_START_BLOCK}|g" \
     -e "s|\${FACTORY_START_BLOCK}|${FACTORY_START_BLOCK}|g" \
     "$TEMPLATE" > "$OUTPUT"

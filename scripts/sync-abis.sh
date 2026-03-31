@@ -38,9 +38,10 @@ for contract in "${CONTRACTS[@]}"; do
     # Fallback: use Node.js if jq is unavailable
     node -e "
       const fs = require('fs');
-      const artifact = JSON.parse(fs.readFileSync('$src', 'utf8'));
-      fs.writeFileSync('$dest', JSON.stringify(artifact.abi, null, 2) + '\n');
-    "
+      const [,, s, d] = process.argv;
+      const artifact = JSON.parse(fs.readFileSync(s, 'utf8'));
+      fs.writeFileSync(d, JSON.stringify(artifact.abi, null, 2) + '\n');
+    " "$src" "$dest"
   fi
 
   echo "  ✓ ${contract}.json → subgraph/abis/"
