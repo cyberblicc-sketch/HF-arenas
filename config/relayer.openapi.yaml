@@ -1,0 +1,45 @@
+openapi: 3.0.3
+info:
+  title: The Arena HF TOP Relayer API
+  version: 1.3.0
+servers:
+  - url: https://api.thearena.hf
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+  /api/v1/relay/submit:
+    post:
+      summary: Submit gasless transaction via Gelato ERC2771
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                target: { type: string }
+                chainId: { type: integer }
+                userAddress: { type: string }
+                marketId: { type: string }
+                amount: { type: string }
+                data: { type: string }
+                deadline: { type: integer }
+      responses:
+        '201':
+          description: Relay accepted
+  /api/v1/relay/signature:
+    post:
+      summary: Generate oracle EIP-712 signature
+      responses:
+        '200':
+          description: Signature generated
+  /api/v1/relay/status:
+    post:
+      summary: Check relay task status
+      responses:
+        '200':
+          description: Status response
