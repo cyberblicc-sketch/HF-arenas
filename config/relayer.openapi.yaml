@@ -1,16 +1,135 @@
 openapi: 3.0.3
 info:
   title: The Arena HF TOP Relayer API
+  description: |
+    Gasless relay, oracle-signature, and compliance endpoints for
+    The Arena HF TOP prediction-market platform.
   version: 1.3.0
 servers:
   - url: https://api.thearena.hf
+    description: Production
+  - url: http://localhost:3001/api
+    description: Local development
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    SubmitRelayRequest:
+      type: object
+      required: [target, chainId, userAddress, marketId, amount, data]
+      properties:
+        signedRequest:
+          type: string
+          description: Optional user-signed forward request payload
+        target:
+          type: string
+          pattern: "^0x[a-fA-F0-9]{40}$"
+          description: Target contract address (checksummed)
+        chainId:
+          type: integer
+          minimum: 1
+          example: 137
+        userAddress:
+          type: string
+          pattern: "^0x[a-fA-F0-9]{40}$"
+        marketId:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: "^[a-zA-Z0-9._-]+$"
+        amount:
+          type: string
+          pattern: "^[1-9][0-9]*$"
+          maxLength: 12
+          description: USDC amount in base units (6 decimals), max 100 000 000 000
+        data:
+          type: string
+          pattern: "^0x[a-fA-F0-9]*$"
+          description: Forwarded calldata payload (hex)
+        deadline:
+          type: integer
+          minimum: 0
+          description: Signature deadline unix timestamp (max 6 min in future)
+    OracleSignatureRequest:
+      type: object
+      required: [user, outcome, amount, marketAddress, chainId]
+      properties:
+        user:
+          type: string
+          pattern: "^0x[a-fA-F0-9]{40}$"
+        outcome:
+          type: string
+          description: Outcome identifier (bytes32 hex)
+        amount:
+          type: string
+          pattern: "^[1-9][0-9]*$"
+          maxLength: 12
+        nonce:
+          type: integer
+          minimum: 0
+        marketAddress:
+          type: string
+          pattern: "^0x[a-fA-F0-9]{40}$"
+        chainId:
+          type: integer
+          minimum: 1
+    RelayResponse:
+      type: object
+      properties:
+        taskId:
+          type: string
+        estimatedExecution:
+          type: integer
+        txHash:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [PENDING, EXECUTED, FAILED]
+    OracleSignatureResponse:
+      type: object
+      properties:
+        nonce:
+          type: integer
+        signature:
+          type: string
+        deadline:
+          type: integer
+        marketAddress:
+          type: string
+    ErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+        message:
+          type: string
+        error:
+          type: string
+
+security:
+  - BearerAuth: []
+
 paths:
   /api/health:
     get:
       summary: Health check
+      security: []
       responses:
         '200':
-          description: OK
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  service: { type: string }
+                  timestamp: { type: string, format: date-time }
+
   /api/v1/relay/submit:
     post:
       summary: Submit gasless transaction via Gelato ERC2771
@@ -19,27 +138,74 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                target: { type: string }
-                chainId: { type: integer }
-                userAddress: { type: string }
-                marketId: { type: string }
-                amount: { type: string }
-                data: { type: string }
-                deadline: { type: integer }
+              $ref: '#/components/schemas/SubmitRelayRequest'
       responses:
         '201':
           description: Relay accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelayResponse'
+        '400':
+          description: Validation error or insufficient balance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Address restricted by compliance policy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/relay/signature:
     post:
-      summary: Generate oracle EIP-712 signature
+      summary: Generate oracle EIP-712 signature for bet parameters
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OracleSignatureRequest'
       responses:
         '200':
           description: Signature generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OracleSignatureResponse'
+        '400':
+          description: Invalid address or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/v1/relay/status:
     post:
       summary: Check relay task status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [taskId]
+              properties:
+                taskId:
+                  type: string
+                  minLength: 1
       responses:
         '200':
-          description: Status response
+          description: Task status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelayResponse'
+        '400':
+          description: Invalid task ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

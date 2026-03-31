@@ -41,7 +41,7 @@ export class RelayService implements OnApplicationShutdown {
 
   async generateOracleSignature(dto: OracleSignatureDto) {
     const nonce = dto.nonce ?? Math.floor(Date.now() / 1000);
-    const deadline = Math.floor(Date.now() / 1000) + 300;
+    const deadline = Math.floor(Date.now() / 1000) + 300; // 5-minute validity
 
     if (!ethers.isAddress(dto.user)) throw new BadRequestException('Invalid user address');
     if (!ethers.isAddress(dto.marketAddress)) throw new BadRequestException('Invalid market address');
@@ -73,6 +73,8 @@ export class RelayService implements OnApplicationShutdown {
       deadline,
     };
 
+    // SECURITY: ORACLE_PRIVATE_KEY is validated at bootstrap (see main.ts).
+    // In production, replace with KMS / HSM signing.
     const oracleKey = process.env.ORACLE_PRIVATE_KEY;
     if (!oracleKey) throw new BadRequestException('Oracle signing key not configured');
 
@@ -86,9 +88,11 @@ export class RelayService implements OnApplicationShutdown {
     await this.validateBalance(dto.userAddress, dto.amount);
     await this.validateDeadline(dto.deadline);
 
+    // Deterministic idempotency key: same user+target+market+data always hashes the same.
+    // This prevents duplicate relay of the exact same intent regardless of timing.
     const idempotencyKey = ethers.keccak256(
       ethers.toUtf8Bytes(
-        `${dto.userAddress}-${dto.target}-${dto.amount}-${dto.marketId}-${Math.floor(Date.now() / 30000)}`,
+        `${dto.userAddress}-${dto.target}-${dto.amount}-${dto.marketId}-${dto.data}`,
       ),
     );
 
@@ -152,7 +156,7 @@ export class RelayService implements OnApplicationShutdown {
     if (!deadline) return;
     const now = Math.floor(Date.now() / 1000);
     if (deadline < now) throw new BadRequestException('Transaction deadline expired');
-    if (deadline > now + 6 * 60) throw new BadRequestException('Deadline too far in future');
+    if (deadline > now + 6 * 60) throw new BadRequestException('Deadline too far in future (max 6 min)');
   }
 
   private async checkSanctions(address: string) {
@@ -168,7 +172,9 @@ export class RelayService implements OnApplicationShutdown {
   }
 
   private async validateBalance(user: string, amount: string) {
-    const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+    const rpcUrl = process.env.RPC_URL;
+    if (!rpcUrl) throw new BadRequestException('RPC_URL not configured');
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
     const usdcAddress = process.env.USDC_ADDRESS;
     if (!usdcAddress) throw new BadRequestException('USDC address not configured');
     const usdc = new ethers.Contract(
@@ -217,7 +223,16 @@ export class RelayService implements OnApplicationShutdown {
         }
       } catch (error) {
         this.logger.error(`Polling error for ${taskId}`, error as any);
-        if (attempts > 60) this.clearTimer(taskId, safetyTimeout);
+        if (attempts > 60) {
+          // Mark the transaction as FAILED so it doesn't stay PENDING forever
+          await this.prisma.relayedTransaction
+            .update({
+              where: { id: dbId },
+              data: { status: 'FAILED', error: 'Polling abandoned after repeated errors' },
+            })
+            .catch((updateErr) => this.logger.error('Failed to update tx status', updateErr as any));
+          this.clearTimer(taskId, safetyTimeout);
+        }
       }
     }, 15000);
 

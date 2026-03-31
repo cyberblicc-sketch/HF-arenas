@@ -1,38 +1,89 @@
 version: '3.8'
+
+# ──────────────────────────────────────────────────────────────────────
+# Production-like docker-compose for The Arena HF TOP
+#
+# IMPORTANT: Before deploying to production:
+#   1. Replace all default credentials below with strong secrets.
+#   2. Remove host-exposed ports for db and redis (or firewall them).
+#   3. Use a secrets manager (Vault, AWS SM) rather than env vars.
+# ──────────────────────────────────────────────────────────────────────
+
 services:
   relayer:
-    build: ./apps/relayer
+    build:
+      context: ../
+      dockerfile: apps/relayer/Dockerfile
+    restart: unless-stopped
     ports:
       - "3001:3001"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/arena
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-arena}
       - REDIS_URL=redis://redis:6379
+      - PORT=3001
+    env_file:
+      - ../.env
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
   indexer:
-    build: ./apps/indexer
+    build:
+      context: ../
+      dockerfile: apps/indexer/Dockerfile
+    restart: unless-stopped
     ports:
       - "3002:3002"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/arena
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-arena}
+      - PORT=3002
+    env_file:
+      - ../.env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
   db:
     image: postgres:15-alpine
     restart: unless-stopped
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=arena
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-arena}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   redis:
     image: redis:7-alpine
     restart: unless-stopped
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:

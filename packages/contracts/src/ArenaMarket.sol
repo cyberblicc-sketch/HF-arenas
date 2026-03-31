@@ -104,6 +104,7 @@ contract ArenaMarket is Initializable, ReentrancyGuardUpgradeable, EIP712Upgrade
 
         for (uint256 i = 0; i < marketOutcomes.length; i++) {
             require(marketOutcomes[i] != bytes32(0), "Market: zero outcome");
+            require(!isValidOutcome[marketOutcomes[i]], "Market: duplicate outcome");
             outcomes.push(marketOutcomes[i]);
             isValidOutcome[marketOutcomes[i]] = true;
         }

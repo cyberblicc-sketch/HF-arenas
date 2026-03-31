@@ -65,6 +65,10 @@ model Market {
   positions       Position[]
   creator         Creator?        @relation(fields: [creatorId], references: [id])
   repository      Repository?     @relation(fields: [repositoryId], references: [id])
+
+  @@index([status])
+  @@index([creatorId])
+  @@index([repositoryId])
 }
 
 model MarketOutcome {
@@ -132,6 +136,7 @@ model RelayedTransaction {
 
   @@index([userAddress])
   @@index([gelatoTaskId])
+  @@index([status])
 }
 
 model SanctionCheck {
@@ -152,6 +157,8 @@ model RepoSnapshot {
   snapshotHash String   @unique
   signature    String
   createdAt    DateTime @default(now())
+
+  @@index([repositoryId])
 }
 
 model SyncState {

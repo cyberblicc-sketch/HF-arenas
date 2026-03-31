@@ -31,6 +31,7 @@ type Bet @entity {
   user: User!
   amount: BigInt!
   oddsAtBet: BigDecimal!
+  feeBpsAtBet: Int!
   status: String!
   createdAt: BigInt!
   claimedAt: BigInt

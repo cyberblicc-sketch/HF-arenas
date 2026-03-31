@@ -1,15 +1,23 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '@arena/shared-prisma';
 import crypto from 'crypto';
 
 @Injectable()
-export class SumsubProvider {
+export class SumsubProvider implements OnModuleInit {
   private readonly logger = new Logger(SumsubProvider.name);
   private readonly baseUrl = 'https://api.sumsub.com';
   private readonly appToken = process.env.SUMSUB_APP_TOKEN || '';
   private readonly secretKey = process.env.SUMSUB_SECRET_KEY || '';
 
   constructor(private readonly prisma: PrismaService) {}
+
+  onModuleInit() {
+    if (!this.appToken || !this.secretKey) {
+      this.logger.warn(
+        'SUMSUB_APP_TOKEN / SUMSUB_SECRET_KEY not set — KYC endpoints will reject all requests.',
+      );
+    }
+  }
 
   async createApplicant(userId: string, levelName: string) {
     const timestamp = Date.now();

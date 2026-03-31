@@ -4,7 +4,27 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
+/** Fail fast if critical environment variables are missing. */
+function validateEnvironment(logger: Logger) {
+  const required: string[] = ['DATABASE_URL'];
+  const warned: string[] = ['SUBGRAPH_URL'];
+
+  const missing = required.filter((k) => !process.env[k]);
+  if (missing.length > 0) {
+    logger.error(`Missing required environment variables: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+
+  const missingOptional = warned.filter((k) => !process.env[k]);
+  if (missingOptional.length > 0) {
+    logger.warn(`Missing recommended env vars (sync will be disabled): ${missingOptional.join(', ')}`);
+  }
+}
+
 async function bootstrap() {
+  const logger = new Logger('bootstrap');
+  validateEnvironment(logger);
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.enableShutdownHooks();
   app.use(helmet());
@@ -21,7 +41,6 @@ async function bootstrap() {
   const port = Number(process.env.PORT || 3002);
   await app.listen(port);
 
-  const logger = new Logger('bootstrap');
   logger.log(`Indexer API listening on port ${port}`);
 }
 
