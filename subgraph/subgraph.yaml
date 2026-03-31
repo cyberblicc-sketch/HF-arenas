@@ -1,0 +1,79 @@
+specVersion: 0.0.6
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: ArenaRegistry
+    network: polygon
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: ArenaRegistry
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      file: ./src/registry.ts
+      entities:
+        - Market
+        - User
+      abis:
+        - name: ArenaRegistry
+          file: ./abis/ArenaRegistry.json
+      eventHandlers:
+        - event: MarketRegistered(indexed address,indexed string)
+          handler: handleMarketRegistered
+  - kind: ethereum
+    name: ArenaFactory
+    network: polygon
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: ArenaFactory
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      file: ./src/factory.ts
+      entities:
+        - Market
+      abis:
+        - name: ArenaFactory
+          file: ./abis/ArenaFactory.json
+      eventHandlers:
+        - event: MarketCreated(indexed address,indexed string,indexed address,address)
+          handler: handleMarketCreated
+templates:
+  - name: ArenaMarket
+    kind: ethereum/contract
+    network: polygon
+    source:
+      abi: ArenaMarket
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      file: ./src/market.ts
+      entities:
+        - Market
+        - Outcome
+        - Bet
+        - User
+      abis:
+        - name: ArenaMarket
+          file: ./abis/ArenaMarket.json
+      eventHandlers:
+        - event: MarketInitialized(indexed string,indexed address)
+          handler: handleMarketInitialized
+        - event: BetPlaced(indexed address,indexed bytes32,uint256,uint256,uint256)
+          handler: handleBetPlaced
+        - event: MarketClosed(uint256)
+          handler: handleMarketClosed
+        - event: ResolutionProposed(indexed bytes32,indexed bytes32)
+          handler: handleResolutionProposed
+        - event: MarketFinalized(indexed bytes32,uint256)
+          handler: handleMarketFinalized
+        - event: ClaimExecuted(indexed address,uint256)
+          handler: handleClaimExecuted
+        - event: MarketVoided(string)
+          handler: handleMarketVoided
