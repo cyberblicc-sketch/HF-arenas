@@ -68,6 +68,7 @@ export function handleBetPlaced(event: BetPlaced): void {
   bet.user = user.id;
   bet.amount = event.params.amount;
   bet.oddsAtBet = outcome.odds;
+  bet.feeBpsAtBet = event.params.feeBpsAtBet.toI32();
   bet.status = 'ACTIVE';
   bet.createdAt = event.block.timestamp;
   bet.save();

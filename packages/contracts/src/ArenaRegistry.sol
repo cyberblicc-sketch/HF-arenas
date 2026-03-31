@@ -44,6 +44,7 @@ contract ArenaRegistry is AccessControl, Pausable {
     event CreatorBondPosted(address indexed creator, uint256 amount);
     event CreatorBondSlashed(address indexed creator, uint256 amount, string reason);
     event CreatorBondReleased(address indexed creator, uint256 amount);
+    event BetLimitsUpdated(uint256 minBet, uint256 maxBet);
 
     constructor(address _collateral, address _admin) {
         require(_collateral != address(0), "Registry: zero collateral");
@@ -91,12 +92,15 @@ contract ArenaRegistry is AccessControl, Pausable {
     }
 
     function lockCreatorBond(address c, uint256 amount) external onlyRole(OPERATOR_ROLE) {
+        require(c != address(0), "Registry: zero address");
+        require(amount > 0, "Registry: zero amount");
         creatorBondLocked[c] += amount;
         collateral.safeTransferFrom(c, address(this), amount);
         emit CreatorBondPosted(c, amount);
     }
 
     function slashCreatorBond(address c, uint256 amount, string calldata reason) external onlyRole(OPERATOR_ROLE) {
+        require(amount > 0, "Registry: zero amount");
         require(amount <= creatorBondLocked[c], "Registry: insufficient");
         creatorBondLocked[c] -= amount;
         collateral.safeTransfer(treasury, amount);
@@ -104,10 +108,19 @@ contract ArenaRegistry is AccessControl, Pausable {
     }
 
     function releaseCreatorBond(address c, uint256 amount) external onlyRole(OPERATOR_ROLE) {
+        require(amount > 0, "Registry: zero amount");
         require(amount <= creatorBondLocked[c], "Registry: insufficient");
         creatorBondLocked[c] -= amount;
         collateral.safeTransfer(c, amount);
         emit CreatorBondReleased(c, amount);
+    }
+
+    function setBetLimits(uint256 _min, uint256 _max) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_min > 0, "Registry: zero minBet");
+        require(_max >= _min, "Registry: maxBet < minBet");
+        minBet = _min;
+        maxBet = _max;
+        emit BetLimitsUpdated(_min, _max);
     }
 
     function setSanctionStatus(address a, bool s) external onlyRole(OPERATOR_ROLE) {

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 
 export type SanctionsScreeningResult = {
   address: string;
@@ -8,12 +8,21 @@ export type SanctionsScreeningResult = {
 };
 
 @Injectable()
-export class SanctionsProvider {
+export class SanctionsProvider implements OnModuleInit {
   private readonly logger = new Logger(SanctionsProvider.name);
   private readonly provider = (process.env.SANCTIONS_PROVIDER || 'TRM') as 'TRM' | 'CHAINALYSIS';
   private readonly apiKey = process.env.TRM_API_KEY || process.env.CHAINALYSIS_API_KEY || '';
   private readonly baseUrl =
     this.provider === 'TRM' ? 'https://api.trmlabs.com/public/v1' : 'https://api.chainalysis.com/api/v1';
+
+  onModuleInit() {
+    if (!this.apiKey) {
+      this.logger.warn(
+        'No sanctions API key configured (TRM_API_KEY / CHAINALYSIS_API_KEY). ' +
+          'All addresses will be treated as HIGH risk (fail-closed).',
+      );
+    }
+  }
 
   get providerName() {
     return this.provider;
