@@ -14,7 +14,7 @@ contract ArenaFactoryTest is Test {
     MockUSDC internal usdc;
 
     address internal admin = address(0xA11CE);
-    address internal oracle = address(0x0RACLE);
+    address internal oracle = address(0x0000000000000000000000000000000000000ACE);
     address internal creator = address(0xC0DE);
     address internal referrer = address(0xFEED);
 
@@ -120,7 +120,7 @@ contract ArenaFactoryTest is Test {
     function testCreateMarketWithBondPayment() public {
         // Test the auto-lock path: creator is approved but has no bond locked yet.
         // The factory will call registry.lockCreatorBond, which pulls from the creator.
-        address bondedCreator = address(0xB0ND);
+        address bondedCreator = address(0xB0D);
         uint256 bond = registry.creatorBondAmount();
 
         // Approve as creator (no bond locked yet)
