@@ -112,11 +112,12 @@ contract ArenaMarketLifecycleTest is Test {
         vm.expectRevert("Market: challenged requires operator");
         market.finalizeResolution();
 
+        bytes32 oracleRole = registry.ORACLE_ROLE();
         vm.prank(admin);
-        registry.grantRole(registry.OPERATOR_ROLE(), oracle);
+        registry.grantRole(oracleRole, admin);
 
         uint256 treasuryBefore = usdc.balanceOf(admin);
-        vm.prank(oracle);
+        vm.prank(admin);
         market.finalizeResolution();
         uint256 treasuryAfter = usdc.balanceOf(admin);
 
