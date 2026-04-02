@@ -169,6 +169,47 @@ contract ArenaFactoryTest is Test {
         assertEq(registry.creatorBondLocked(bondedCreator), bond);
     }
 
+    function testCreateMarketDoesNotRelockBondWhenAlreadyLocked() public {
+        uint256 bond = registry.creatorBondAmount();
+        uint256 extra = 100 * 10 ** 6;
+        usdc.mint(creator, bond + extra);
+        vm.prank(creator);
+        usdc.approve(address(registry), bond + extra);
+
+        vm.prank(admin);
+        registry.lockCreatorBond(creator, bond);
+        assertEq(registry.creatorBondLocked(creator), bond);
+
+        ArenaMarket.MarketParams memory params = _defaultParams();
+        params.marketId = "factory-test-locked";
+
+        vm.prank(creator);
+        factory.createMarket(params, _defaultOutcomes(), referrer, 0);
+        assertEq(registry.creatorBondLocked(creator), bond);
+    }
+
+    function testCreateMarketRevertsWhenBondTransferFails() public {
+        address bondedCreator = address(0xB0D1);
+        vm.prank(admin);
+        registry.setCreatorStatus(bondedCreator, true);
+
+        // Creator is approved but has no USDC/allowance, so lockCreatorBond transfer should fail.
+        ArenaMarket.MarketParams memory params = _defaultParams();
+        params.marketId = "factory-test-bond-fail";
+
+        vm.prank(bondedCreator);
+        vm.expectRevert("ERC20: insufficient balance");
+        factory.createMarket(params, _defaultOutcomes(), referrer, 0);
+    }
+
+    function testCheckBondAllowance() public {
+        uint256 bond = registry.creatorBondAmount();
+        assertFalse(factory.checkBondAllowance(creator));
+        vm.prank(creator);
+        usdc.approve(address(registry), bond);
+        assertTrue(factory.checkBondAllowance(creator));
+    }
+
     // ─── upgradeBeacon ────────────────────────────────────────────────────────
 
     function testUpgradeBeaconSuccess() public {

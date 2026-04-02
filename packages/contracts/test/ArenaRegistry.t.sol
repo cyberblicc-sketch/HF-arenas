@@ -98,6 +98,21 @@ contract ArenaRegistryTest is Test {
         registry.setFees(100, 100, 50, 50);
     }
 
+    function testExecuteFeesRevertsWhenNoPending() public {
+        vm.prank(admin);
+        vm.expectRevert("Registry: no pending fees");
+        registry.executeFees();
+    }
+
+    function testExecuteFeesRevertsWhileTimelockActive() public {
+        vm.prank(admin);
+        registry.setFees(300, 150, 50, 100);
+        vm.warp(block.timestamp + registry.treasuryTimelock() - 1);
+        vm.prank(admin);
+        vm.expectRevert("Registry: timelock active");
+        registry.executeFees();
+    }
+
     // ─── setTreasury ─────────────────────────────────────────────────────────
 
     function testSetTreasurySuccess() public {
@@ -119,6 +134,21 @@ contract ArenaRegistryTest is Test {
         vm.prank(operator);
         vm.expectRevert();
         registry.setTreasury(treasury2);
+    }
+
+    function testExecuteTreasuryRevertsWhenNoPending() public {
+        vm.prank(admin);
+        vm.expectRevert("Registry: no pending treasury");
+        registry.executeTreasury();
+    }
+
+    function testExecuteTreasuryRevertsWhileTimelockActive() public {
+        vm.prank(admin);
+        registry.setTreasury(treasury2);
+        vm.warp(block.timestamp + registry.treasuryTimelock() - 1);
+        vm.prank(admin);
+        vm.expectRevert("Registry: timelock active");
+        registry.executeTreasury();
     }
 
     // ─── setBeacon ───────────────────────────────────────────────────────────
@@ -169,6 +199,27 @@ contract ArenaRegistryTest is Test {
         assertTrue(registry.isCreator(creator));
     }
 
+    function testSetCreatorBondAmount() public {
+        uint256 newAmount = 750 * 10 ** 6;
+        vm.prank(admin);
+        registry.setCreatorBondAmount(newAmount);
+        assertEq(registry.creatorBondAmount(), newAmount);
+    }
+
+    function testSetChallengeBondAmount() public {
+        uint256 newAmount = 25 * 10 ** 6;
+        vm.prank(admin);
+        registry.setChallengeBondAmount(newAmount);
+        assertEq(registry.challengeBondAmount(), newAmount);
+    }
+
+    function testSetOracleModule() public {
+        address oracleModule = address(0x0BAD);
+        vm.prank(admin);
+        registry.setOracleModule(oracleModule);
+        assertEq(registry.oracleModule(), oracleModule);
+    }
+
     // ─── Sanction checks ─────────────────────────────────────────────────────
 
     function testSanctionStatus() public {
@@ -196,6 +247,14 @@ contract ArenaRegistryTest is Test {
         vm.prank(operator);
         vm.expectRevert();
         registry.pause();
+    }
+
+    function testUnpauseRevertsForNonAdmin() public {
+        vm.prank(admin);
+        registry.pause();
+        vm.prank(operator);
+        vm.expectRevert();
+        registry.unpause();
     }
 
     // ─── Creator bond ─────────────────────────────────────────────────────────
@@ -245,5 +304,11 @@ contract ArenaRegistryTest is Test {
         vm.stopPrank();
 
         assertEq(registry.creatorBondLocked(creator), 0);
+    }
+
+    function testReleaseCreatorBondRevertsIfInsufficientBond() public {
+        vm.prank(admin);
+        vm.expectRevert("Registry: insufficient");
+        registry.releaseCreatorBond(creator, 1);
     }
 }
